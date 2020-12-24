@@ -112,9 +112,10 @@ class TftpClient(TftpSession):
                                                data,
                                                timeout,
                                                localip = self.localip)
-        self.context.start()
-        # Upload happens here
-        self.context.end()
+        try:
+            self.context.start()
+        finally:
+            self.context.end() # for socket close and file close(avoid exception)
 
         metrics = self.context.metrics
 

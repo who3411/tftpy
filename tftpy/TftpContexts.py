@@ -484,6 +484,7 @@ class TftpContextClientRawdata(TftpContext):
             pkt.filename = self.file_to_transfer
         pkt.mode = self.mode
         pkt.options = self.options
+        pkt.encode() # create pkt.buffer(avoid exception)
         self.sock.sendto(self.data, (self.host, self.port))
         self.next_block = 1
         self.last_pkt = pkt
