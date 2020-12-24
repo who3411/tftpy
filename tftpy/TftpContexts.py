@@ -316,7 +316,6 @@ class TftpContextClientUpload(TftpContext):
         while self.state:
             try:
                 log.debug("State is %s" % self.state)
-                print("State is %s" % self.state)
                 self.cycle()
             except TftpTimeout as err:
                 log.error(str(err))
@@ -400,7 +399,6 @@ class TftpContextClientDownload(TftpContext):
         while self.state:
             try:
                 log.debug("State is %s" % self.state)
-                print("State is %s" % self.state)
                 self.cycle()
             except TftpTimeout as err:
                 log.error(str(err))
@@ -451,11 +449,6 @@ class TftpContextClientRawdata(TftpContext):
         self.cmd_num  = int("0x"+data.encode('hex')[0:4], 0)
         self.filepath = data[2:first_zero]
         self.mode     = data[first_zero+1:second_zero]
-        print(self.cmd_num)
-        print(self.filepath)
-        print(self.mode)
-        print(first_zero)
-        print(second_zero)
 
         self.file_to_transfer = self.filepath
         self.filelike_fileobj = False
@@ -463,10 +456,8 @@ class TftpContextClientRawdata(TftpContext):
 
         if self.cmd_num == 1:
             self.fileobj = open(self.filepath, "wb")
-            print(self.filepath + " wb")
         elif self.cmd_num == 2 and os.path.exists(self.filepath):
             self.fileobj = open(self.filepath, "rb")
-            print(self.filepath + " rb")
         else:
             self.fileobj = open("/dev/null", "wb+")
 
@@ -501,7 +492,6 @@ class TftpContextClientRawdata(TftpContext):
         while self.state:
             try:
                 log.debug("State is %s" % self.state)
-                print("State is %s" % self.state)
                 self.cycle()
             except TftpTimeout as err:
                 log.error(str(err))
