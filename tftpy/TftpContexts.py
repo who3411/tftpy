@@ -443,7 +443,7 @@ class TftpContextClientRawdata(TftpContext):
                              localip)
         self.data     = data
         
-        first_zero    = data.index("\x00", 1)
+        first_zero    = data.index("\x00", 2)
         second_zero   = data.index("\x00", first_zero + 1)
 
         self.cmd_num  = int("0x"+data.encode('hex')[0:4], 0)
