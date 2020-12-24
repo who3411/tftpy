@@ -9,7 +9,7 @@ import types
 import logging
 from .TftpShared import *
 from .TftpPacketTypes import *
-from .TftpContexts import TftpContextClientDownload, TftpContextClientUpload
+from .TftpContexts import TftpContextClientDownload, TftpContextClientUpload, TftpContextClientRawdata
 
 log = logging.getLogger('tftpy.TftpClient')
 
@@ -102,6 +102,28 @@ class TftpClient(TftpSession):
             log.info("Duration too short, rate undetermined")
         else:
             log.info("Uploaded %d bytes in %.2f seconds" % (metrics.bytes, metrics.duration))
+            log.info("Average rate: %.2f kbps" % metrics.kbps)
+        log.info("%.2f bytes in resent data" % metrics.resent_bytes)
+        log.info("Resent %d packets" % metrics.dupcount)
+
+    def rawdata(self, data, packethook=None, timeout=SOCK_TIMEOUT):
+        self.context = TftpContextClientRawdata(self.host,
+                                               self.iport,
+                                               data,
+                                               timeout,
+                                               localip = self.localip)
+        self.context.start()
+        # Upload happens here
+        self.context.end()
+
+        metrics = self.context.metrics
+
+        log.info('')
+        log.info("Rawdata complete.")
+        if metrics.duration == 0:
+            log.info("Duration too short, rate undetermined")
+        else:
+            log.info("%d bytes in %.2f seconds" % (metrics.bytes, metrics.duration))
             log.info("Average rate: %.2f kbps" % metrics.kbps)
         log.info("%.2f bytes in resent data" % metrics.resent_bytes)
         log.info("Resent %d packets" % metrics.dupcount)

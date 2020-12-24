@@ -316,6 +316,7 @@ class TftpContextClientUpload(TftpContext):
         while self.state:
             try:
                 log.debug("State is %s" % self.state)
+                print("State is %s" % self.state)
                 self.cycle()
             except TftpTimeout as err:
                 log.error(str(err))
@@ -399,6 +400,7 @@ class TftpContextClientDownload(TftpContext):
         while self.state:
             try:
                 log.debug("State is %s" % self.state)
+                print("State is %s" % self.state)
                 self.cycle()
             except TftpTimeout as err:
                 log.error(str(err))
@@ -424,6 +426,102 @@ class TftpContextClientDownload(TftpContext):
     def end(self):
         """Finish up the context."""
         TftpContext.end(self, not self.filelike_fileobj)
+        self.metrics.end_time = time.time()
+        log.debug("Set metrics.end_time to %s" % self.metrics.end_time)
+        self.metrics.compute()
+
+
+class TftpContextClientRawdata(TftpContext):
+    def __init__(self,
+                 host,
+                 port,
+                 data, 
+                 timeout,
+                 localip = ""):
+        TftpContext.__init__(self,
+                             host,
+                             port,
+                             timeout,
+                             localip)
+        self.data     = data
+        
+        first_zero    = data.index("\x00", 1)
+        second_zero   = data.index("\x00", first_zero + 1)
+
+        self.cmd_num  = int("0x"+data.encode('hex')[0:4], 0)
+        self.filepath = data[2:first_zero]
+        self.mode     = data[first_zero+1:second_zero]
+        print(self.cmd_num)
+        print(self.filepath)
+        print(self.mode)
+        print(first_zero)
+        print(second_zero)
+
+        self.file_to_transfer = self.filepath
+        self.filelike_fileobj = False
+        self.options          = {}
+
+        if self.cmd_num == 1:
+            self.fileobj = open(self.filepath, "wb")
+            print(self.filepath + " wb")
+        elif self.cmd_num == 2 and os.path.exists(self.filepath):
+            self.fileobj = open(self.filepath, "rb")
+            print(self.filepath + " rb")
+        else:
+            self.fileobj = open("/dev/null", "wb+")
+
+        log.debug("TftpContextClientRawdata.__init__()")
+        log.debug("file_to_transfer = %s, options = %s" %
+            (self.file_to_transfer, self.options))
+
+    def __str__(self):
+        return "%s:%s %s" % (self.host, self.port, self.state)
+
+    def start(self):
+        log.info("Sending tftp upload request to %s" % self.host)
+        log.info("    filename -> %s" % self.file_to_transfer)
+        log.info("    options -> %s" % self.options)
+
+        self.metrics.start_time = time.time()
+        log.debug("Set metrics.start_time to %s" % self.metrics.start_time)
+
+        if self.cmd_num == 1:
+            pkt = TftpPacketRRQ()
+            pkt.filename = self.file_to_transfer
+        else:
+            pkt = TftpPacketWRQ()
+            pkt.filename = self.file_to_transfer
+        pkt.mode = self.mode
+        pkt.options = self.options
+        self.sock.sendto(self.data, (self.host, self.port))
+        self.next_block = 1
+        self.last_pkt = pkt
+
+        self.state = TftpStateSentRRQ(self) if self.cmd_num == 1 else TftpStateSentWRQ(self)
+        while self.state:
+            try:
+                log.debug("State is %s" % self.state)
+                print("State is %s" % self.state)
+                self.cycle()
+            except TftpTimeout as err:
+                log.error(str(err))
+                self.retry_count += 1
+                if self.retry_count >= TIMEOUT_RETRIES:
+                    log.debug("hit max retries, giving up")
+                    raise
+                else:
+                    log.warning("resending last packet")
+                    self.state.resendLast()
+            except TftpFileNotFoundError as err:
+                log.error("Received File not found error")
+                if self.fileobj is not None and not self.filelike_fileobj:
+                    if os.path.exists(self.fileobj.name):
+                        log.debug("unlinking output file of %s", self.fileobj.name)
+                        os.unlink(self.fileobj.name)
+    
+    def end(self):
+        """Finish up the context."""
+        TftpContext.end(self)
         self.metrics.end_time = time.time()
         log.debug("Set metrics.end_time to %s" % self.metrics.end_time)
         self.metrics.compute()
