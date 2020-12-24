@@ -106,10 +106,12 @@ class TftpClient(TftpSession):
         log.info("%.2f bytes in resent data" % metrics.resent_bytes)
         log.info("Resent %d packets" % metrics.dupcount)
 
-    def rawdata(self, data, packethook=None, timeout=SOCK_TIMEOUT):
+    def rawdata(self, opcode, filepath, mode, packethook=None, timeout=SOCK_TIMEOUT):
         self.context = TftpContextClientRawdata(self.host,
                                                self.iport,
-                                               data,
+                                               opcode,
+                                               filepath,
+                                               mode,
                                                timeout,
                                                localip = self.localip)
         try:

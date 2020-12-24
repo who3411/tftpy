@@ -16,6 +16,7 @@ from .TftpPacketTypes import *
 from .TftpPacketFactory import TftpPacketFactory
 from .TftpStates import *
 import socket
+import struct
 import time
 import sys
 import os
@@ -433,7 +434,9 @@ class TftpContextClientRawdata(TftpContext):
     def __init__(self,
                  host,
                  port,
-                 data, 
+                 opcode,
+                 filepath,
+                 mode,
                  timeout,
                  localip = ""):
         TftpContext.__init__(self,
@@ -441,23 +444,21 @@ class TftpContextClientRawdata(TftpContext):
                              port,
                              timeout,
                              localip)
-        self.data     = data
-        
-        first_zero    = data.index("\x00", 2)
-        second_zero   = data.index("\x00", first_zero + 1)
+        self.opcode   = opcode
+        self.filepath = filepath
+        self.mode     = mode
 
-        self.cmd_num  = int("0x"+data.encode('hex')[0:4], 0)
-        self.filepath = data[2:first_zero]
-        self.mode     = data[first_zero+1:second_zero]
+        self.data = struct.pack(">{}s{}sB{}sB".format(len(opcode), len(filepath), 
+                                   len(mode)), opcode, filepath, 0x00, mode, 0x00)
 
         self.file_to_transfer = self.filepath
         self.filelike_fileobj = False
         self.options          = {}
 
-        if self.cmd_num == 1:
-            self.fileobj = open(self.filepath, "wb")
-        elif self.cmd_num == 2 and os.path.exists(self.filepath):
-            self.fileobj = open(self.filepath, "rb")
+        #if opcode == "\x00\x01":
+        #    self.fileobj = open(filepath, "wb")
+        if opcode == "\x00\x02" and os.path.exists(filepath):
+            self.fileobj = open(filepath, "rb")
         else:
             self.fileobj = open("/dev/null", "wb+")
 
@@ -469,14 +470,14 @@ class TftpContextClientRawdata(TftpContext):
         return "%s:%s %s" % (self.host, self.port, self.state)
 
     def start(self):
-        log.info("Sending tftp upload request to %s" % self.host)
+        log.info("Sending tftp rawdata request to %s" % self.host)
         log.info("    filename -> %s" % self.file_to_transfer)
         log.info("    options -> %s" % self.options)
 
         self.metrics.start_time = time.time()
         log.debug("Set metrics.start_time to %s" % self.metrics.start_time)
 
-        if self.cmd_num == 1:
+        if self.opcode == "\x00\x01":
             pkt = TftpPacketRRQ()
             pkt.filename = self.file_to_transfer
         else:
@@ -489,7 +490,7 @@ class TftpContextClientRawdata(TftpContext):
         self.next_block = 1
         self.last_pkt = pkt
 
-        self.state = TftpStateSentRRQ(self) if self.cmd_num == 1 else TftpStateSentWRQ(self)
+        self.state = TftpStateSentRRQ(self) if self.opcode == "\x00\x01" else TftpStateSentWRQ(self)
         while self.state:
             try:
                 log.debug("State is %s" % self.state)
